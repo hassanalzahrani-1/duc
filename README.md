@@ -198,6 +198,7 @@ intelligent-doc-assistant/
 ├── .ebignore                    # Files to exclude from deployment zip
 ├── .env.example                 # Environment variables template
 ├── requirements.txt             # Python dependencies
+├── docker-compose.yml           # EB multi-container configuration (v3)
 ├── DEPLOY.txt                   # Simple deployment instructions
 └── README.md                    # This file
 ```
