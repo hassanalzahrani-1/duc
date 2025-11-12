@@ -1,0 +1,28 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+chardet==5.2.0
+markdown==3.10
+
+# LangChain + providers
+langchain==0.2.14
+langchain-community==0.2.12
+langchain-openai==0.1.21
+langchain-chroma==0.1.4
+langchain-text-splitters==0.2.2
+
+# Vector store
+chromadb==0.5.3
+
+# Loaders
+pypdf==4.3.1
+docx2txt==0.8
+unstructured==0.15.7
+unstructured[md]==0.15.7
+unstructured[html]==0.15.7
+
+# Optional: CSV loader deps
+pandas==2.2.2
