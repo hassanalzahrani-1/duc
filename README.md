@@ -175,9 +175,6 @@ intelligent-doc-assistant/
 ├── Dockerfile                   # Backend container (for local dev)
 ├── docker-compose.yml           # Local development with Docker
 ├── README.md                    # Main documentation
-├── EB_DEPLOYMENT.md             # AWS Elastic Beanstalk guide
-├── DEPLOYMENT_CHECKLIST.md      # Pre-deployment checklist
-└── PERSISTENCE.md               # Chat history persistence docs
 ```
 
 ## 🚀 Quick Start
@@ -480,8 +477,6 @@ Deploy Duc to AWS in minutes with enterprise-grade scalability and reliability!
 - 💰 Cost-effective (~$35/month starting)
 
 **Quick Deployment:**
-
-See **[EB_DEPLOYMENT.md](./EB_DEPLOYMENT.md)** for the complete step-by-step guide.
 
 ```bash
 # 1. Install AWS EB CLI
