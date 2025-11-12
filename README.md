@@ -20,7 +20,8 @@
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License"/>
   <img src="https://img.shields.io/badge/TypeScript-5+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
-  <img src="https://img.shields.io/badge/AWS-EB_Ready-FF9900?style=flat-square&logo=amazonaws&logoColor=white" alt="AWS"/>
+  <img src="https://img.shields.io/badge/Docker-Multi--Container-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"/>
+  <img src="https://img.shields.io/badge/AWS-EB_Docker-FF9900?style=flat-square&logo=amazonaws&logoColor=white" alt="AWS"/>
 </p>
 
 </div>
@@ -33,7 +34,9 @@
 
 Duc is a production-ready, enterprise-grade application that brings your documents to life. Upload PDFs, Word files, spreadsheets, and more—then chat naturally with Duc to extract insights, find information, and understand complex content instantly. With its beautiful duck-themed interface, intelligent RAG pipeline, and persistent memory, Duc makes document analysis effortless and enjoyable.
 
-**⚡ Powered by:** FastAPI • React • TypeScript • LangChain • OpenAI • ChromaDB
+**⚡ Powered by:** FastAPI • React • TypeScript • LangChain • OpenAI • ChromaDB • Docker • Nginx
+
+**🐳 Deployment:** Multi-container Docker on AWS Elastic Beanstalk
 
 ## 📖 Table of Contents
 
@@ -76,10 +79,10 @@ Duc is a production-ready, enterprise-grade application that brings your documen
 ### 🚀 Production-Ready
 - **⚡ High Performance**: FastAPI backend with async support and GZip compression
 - **🏥 Health Monitoring**: Comprehensive health checks with dependency verification
-- **☁️ Cloud-Native**: One-command deployment to AWS Elastic Beanstalk
-- **🐳 Docker Support**: Containerized setup with Docker Compose for easy development
+- **☁️ Cloud-Native**: Multi-container Docker deployment to AWS Elastic Beanstalk
+- **🐳 Docker Architecture**: Separate containers for backend and frontend+nginx
 - **💾 Persistent Storage**: Chroma vector database with automatic persistence
-- **🔒 Secure by Default**: CORS protection, environment-based configuration
+- **🔒 Secure by Default**: CORS protection, environment-based configuration, backend not exposed
 
 ## 🎬 What Can Duc Do?
 
@@ -107,27 +110,53 @@ Duc is a production-ready, enterprise-grade application that brings your documen
 
 ## 🏗️ Architecture
 
-Duc's architecture follows modern best practices for RAG (Retrieval-Augmented Generation) applications:
+Duc uses a **multi-container Docker architecture** with nginx as a reverse proxy:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       Duc Frontend                          │
-│        React + TypeScript + Vite + shadcn/ui                │
-│      (Document Upload • Chat Interface • Management)        │
-└─────────────────────────┬───────────────────────────────────┘
-                          │ REST API
-┌─────────────────────────▼───────────────────────────────────┐
-│                    FastAPI Backend                          │
-│        (Async Endpoints • Health Checks • CORS)             │
-└─────────┬───────────────┬───────────────┬───────────────────┘
-          │               │               │
-          ▼               ▼               ▼
-    ┌─────────┐    ┌──────────┐    ┌──────────┐
-    │LangChain│    │  OpenAI  │    │ ChromaDB │
-    │  Chains │◄───│Embeddings│───►│  Vector  │
-    │   RAG   │    │   LLM    │    │  Store   │
-    └─────────┘    └──────────┘    └──────────┘
+                      ┌─────────────────────┐
+                      │   User's Browser    │
+                      └──────────┬──────────┘
+                                 │ HTTP (Port 80)
+                      ┌──────────▼──────────┐
+                      │  Nginx Container    │
+                      │  ┌──────────────┐   │
+                      │  │   Frontend   │   │  ← Dockerfile.frontend
+                      │  │ (React Build)│   │     (Builds React in container)
+                      │  └──────────────┘   │
+                      │  ┌──────────────┐   │
+                      │  │ Proxy /api/* │   │
+                      │  └──────┬───────┘   │
+                      └─────────┼───────────┘
+                                │ Internal Network
+                      ┌─────────▼───────────┐
+                      │ Backend Container   │
+                      │  ┌──────────────┐   │
+                      │  │   FastAPI    │   │  ← Dockerfile
+                      │  │  (Port 8000) │   │     (Python + deps)
+                      │  └──────┬───────┘   │
+                      │         │           │
+                      │  ┌──────▼───────┐   │
+                      │  │  LangChain   │   │
+                      │  │  RAG Pipeline│   │
+                      │  └──────┬───────┘   │
+                      │         │           │
+                      │  ┌──────▼───────┐   │
+                      │  │   ChromaDB   │◄──┼── Persistent Volume
+                      │  │ Vector Store │   │
+                      │  └──────────────┘   │
+                      └─────────────────────┘
+                                │
+                      ┌─────────▼───────────┐
+                      │   OpenAI API        │
+                      │ (Embeddings + LLM)  │
+                      └─────────────────────┘
 ```
+
+**Container Communication:**
+- **Nginx** listens on port 80 (public)
+- **Backend** only accessible via internal Docker network (secure!)
+- **Nginx** proxies `/api/*` → `http://backend:8000`
+- **Frontend** served directly by nginx
 
 **Data Flow:**
 1. **Document Upload** → Parse & Split → Generate Embeddings → Store in ChromaDB
@@ -158,26 +187,19 @@ intelligent-doc-assistant/
 │   │   ├── App.tsx              # Main application
 │   │   ├── main.tsx
 │   │   └── index.css
+│   ├── nginx.conf               # Nginx routing config (serves frontend, proxies API)
 │   ├── package.json
 │   └── vite.config.ts
-├── .ebextensions/               # Elastic Beanstalk configuration
-│   ├── 01_packages.config       # System dependencies
-│   ├── 02_python.config         # Python settings
-│   ├── 03_storage.config        # Chroma DB storage
-│   └── 04_nginx.config          # Nginx proxy settings
-├── .platform/                   # EB platform hooks
-│   └── nginx/conf.d/
-│       └── cors.conf            # CORS configuration
+├── .ebextensions/               # Elastic Beanstalk Docker configuration
+│   └── 01_storage_docker.config # Creates persistent storage directories
+├── Dockerfile                   # Backend container (FastAPI + Python)
+├── Dockerfile.frontend          # Frontend container (React build + Nginx)
+├── Dockerrun.aws.json           # EB multi-container orchestration
+├── .ebignore                    # Files to exclude from deployment zip
 ├── .env.example                 # Environment variables template
-├── env.yaml.example             # EB environment config template
 ├── requirements.txt             # Python dependencies
-├── Procfile                     # EB startup command
-├── Dockerfile                   # Backend container (for local dev)
-├── docker-compose.yml           # Local development with Docker
-├── README.md                    # Main documentation
-├── EB_DEPLOYMENT.md             # AWS Elastic Beanstalk guide
-├── DEPLOYMENT_CHECKLIST.md      # Pre-deployment checklist
-└── PERSISTENCE.md               # Chat history persistence docs
+├── DEPLOY.txt                   # Simple deployment instructions
+└── README.md                    # This file
 ```
 
 ## 🚀 Quick Start
@@ -186,9 +208,9 @@ intelligent-doc-assistant/
 
 - **Backend**: Python 3.11+, OpenAI API key
 - **Frontend**: Node.js 18+
-- **Optional**: Docker & Docker Compose
+- **Deployment**: Docker, AWS Account
 
-### Option 1: Full Stack Development (Recommended)
+### Local Development
 
 1. **Clone and setup**:
    ```bash
@@ -213,36 +235,8 @@ intelligent-doc-assistant/
    ```
 
 4. **Open your browser**:
-   - **Frontend UI**: http://localhost:3000 <img src="frontend/public/duck-icon.svg" alt="Duc" width="20" height="20" style="vertical-align: middle;"/>
+   - **Frontend UI**: http://localhost:3001 <img src="frontend/public/duck-icon.svg" alt="Duc" width="20" height="20" style="vertical-align: middle;"/>
    - **Backend API**: http://localhost:8000/docs
-
-### Option 2: Docker Compose (Easiest)
-
-```bash
-copy .env.example .env
-# Edit .env and add your OPENAI_API_KEY
-docker compose up --build
-```
-
-Then open http://localhost:3000
-
-### Docker Setup
-
-1. **Configure environment**:
-   ```bash
-   copy .env.example .env
-   # Add your OPENAI_API_KEY to .env
-   ```
-
-2. **Run with Docker Compose**:
-   ```bash
-   docker compose up --build
-   ```
-
-3. **Access the API**:
-   - API: http://localhost:8000
-   - Docs: http://localhost:8000/docs
-   - Health: http://localhost:8000/health
 
 ## 📡 API Endpoints
 
@@ -467,88 +461,97 @@ class Settings(BaseSettings):
 
 ## 🚢 Deployment
 
-### ☁️ AWS Elastic Beanstalk (Recommended)
+### ☁️ AWS Elastic Beanstalk (Multi-Container Docker)
 
-Deploy Duc to AWS in minutes with enterprise-grade scalability and reliability!
+Duc uses a **multi-container Docker architecture** for production deployment:
 
-**Why Elastic Beanstalk?**
-- 🚀 Deploy with a single command
-- 📈 Automatic scaling based on traffic
-- 💾 Persistent storage for ChromaDB
-- 🔒 Built-in HTTPS and security
-- 📊 Integrated CloudWatch monitoring
-- 💰 Cost-effective (~$35/month starting)
-
-**Quick Deployment:**
-
-See **[EB_DEPLOYMENT.md](./EB_DEPLOYMENT.md)** for the complete step-by-step guide.
-
-```bash
-# 1. Install AWS EB CLI
-pip install awsebcli
-
-# 2. Configure environment variables
-copy env.yaml.example env.yaml
-# Edit env.yaml with your OPENAI_API_KEY
-
-# 3. Initialize EB application
-eb init -p python-3.11 duc-document-assistant --region us-east-1
-
-# 4. Create environment and deploy
-eb create duc-prod-env \
-  --instance-type t3.medium \
-  --envvars-file env.yaml \
-  --database.engine postgres \
-  --database.size 20
-
-# 5. Open your deployed application
-eb open
-
-# 6. Update and redeploy anytime
-eb deploy
+```
+┌─────────────────────────────────────┐
+│     Internet (Port 80)              │
+└─────────────┬───────────────────────┘
+              │
+     ┌────────▼────────┐
+     │ Nginx Container  │  ← Dockerfile.frontend
+     │ - Serves Frontend│
+     │ - Proxies /api/* │
+     └────────┬─────────┘
+              │
+     ┌────────▼────────┐
+     │Backend Container│  ← Dockerfile
+     │ - FastAPI:8000  │
+     │ - ChromaDB      │
+     └─────────────────┘
 ```
 
-**What You Get:**
-- ✅ Load-balanced, auto-scaling infrastructure
-- ✅ Persistent EBS volume for vector database
-- ✅ Health monitoring with automatic recovery
-- ✅ Free SSL certificate via AWS Certificate Manager
-- ✅ CloudWatch logs and metrics
-- ✅ Zero-downtime deployments
-- ✅ Easy rollback to previous versions
+**Why Multi-Container Docker?**
+- 🐳 True container isolation
+- 🔒 Backend not directly exposed to internet
+- ⚡ Nginx handles static assets and proxying
+- 📦 Same setup works locally and in production
+- 🚀 Fast deployments with container caching
 
-### 🐳 Docker Deployment
+### Quick Deployment (3 Steps)
 
-Perfect for local development and custom cloud deployments:
+#### 1. Create Deployment Zip
 
-```bash
-# Start full stack with Docker Compose
-docker compose up --build
-
-# Access:
-# Backend API: http://localhost:8000
-# API Documentation: http://localhost:8000/docs
-# Interactive Swagger: http://localhost:8000/redoc
-
-# Run in background
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
+```powershell
+# In project root
+Compress-Archive -Path * -DestinationPath duc-eb-deploy.zip
 ```
+
+#### 2. Upload to AWS
+
+1. Go to [AWS Elastic Beanstalk Console](https://console.aws.amazon.com/elasticbeanstalk)
+2. Click **"Create Application"**
+3. Choose:
+   - **Platform**: Docker
+   - **Platform branch**: Multi-container Docker
+   - **Upload your code**: Select `duc-eb-deploy.zip`
+   - **Instance type**: `t3.small` (testing) or `t3.medium` (production)
+
+#### 3. Set Environment Variable
+
+- Go to **Configuration → Software → Environment properties**
+- Add: `OPENAI_API_KEY` = `sk-your-actual-key`
+- Click **"Apply"**
+
+Wait 5-10 minutes for deployment, then access:
+- **Frontend**: `http://your-env.elasticbeanstalk.com/`
+- **API**: `http://your-env.elasticbeanstalk.com/api/`
+- **Health**: `http://your-env.elasticbeanstalk.com/health`
+- **Docs**: `http://your-env.elasticbeanstalk.com/docs`
+
+### What Gets Deployed
+
+**Files Included:**
+- ✅ `Dockerfile` - Backend container
+- ✅ `Dockerfile.frontend` - Frontend + Nginx container
+- ✅ `Dockerrun.aws.json` - Container orchestration
+- ✅ `app/` - Backend code
+- ✅ `frontend/` - Frontend source (built in container)
+- ✅ `.ebextensions/` - Storage configuration
+
+**Files Excluded (via `.ebignore`):**
+- ❌ `.env` - Set in EB console instead
+- ❌ `node_modules` - Installed in container
+- ❌ `chroma_store` - Created on instance
+- ❌ `frontend/build` - Built in container
+
+### Cost Estimate
+
+- **t3.small**: ~$15/month (testing)
+- **t3.medium**: ~$30/month (production)
+- **Data transfer**: Varies by usage
 
 ### 🌐 Other Cloud Platforms
 
-Duc can be deployed to any cloud platform that supports Docker:
+Duc can be deployed to any platform supporting multi-container Docker:
 
-- **Heroku**: Use the included `Procfile`
-- **Google Cloud Run**: Serverless container deployment
-- **Azure Container Instances**: Quick container hosting
-- **DigitalOcean App Platform**: Simple PaaS deployment
-- **Kubernetes**: Use the Dockerfile for pod deployment
+- **AWS ECS**: Use the Dockerfiles with ECS task definitions
+- **Google Cloud Run**: Deploy both containers separately
+- **Azure Container Instances**: Use container groups
+- **Kubernetes**: Create deployments for both containers
+- **DigitalOcean App Platform**: Upload the same zip
 
 ## 🔒 Security Best Practices
 

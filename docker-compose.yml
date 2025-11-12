@@ -1,15 +1,49 @@
 version: "3.8"
+
 services:
-  api:
-    build: .
-    env_file: .env
-    ports:
-      - "8000:8000"
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: duc-backend:latest
+    container_name: duc-backend
+    environment:
+      - OPENAI_MODEL=gpt-4o-mini
+      - OPENAI_BASE_URL=https://api.openai.com/v1
+      - CHROMA_PATH=./chroma_store
+      - COLLECTION_NAME=docs
+      - CHUNK_SIZE=1500
+      - CHUNK_OVERLAP=200
+      - MAX_CONTEXT_DOCS=6
+      - HOST=0.0.0.0
+      - PORT=8000
+    expose:
+      - "8000"
     volumes:
-      - ./chroma_store:/app/chroma_store  # persist embeddings
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - /var/app/current/chroma_store:/app/chroma_store
+      - /var/app/current/uploads:/app/uploads
+    networks:
+      - app-network
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: duc-nginx:latest
+    container_name: duc-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    links:
+      - backend:api
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

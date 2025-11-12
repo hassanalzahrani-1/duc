@@ -1,0 +1,83 @@
+🚨 EB DEPLOYMENT OUT-OF-MEMORY FIX
+====================================
+
+PROBLEM: Building both containers simultaneously exceeds instance memory
+ERROR: "exit code: 137" = Out of Memory (OOM killed)
+
+SOLUTION OPTIONS (pick one):
+============================
+
+OPTION 1: USE LARGER INSTANCE TEMPORARILY (EASIEST) ⭐
+------------------------------------------------------
+1. Go to EB Console → Configuration → Capacity
+2. Change Instance Type to: t3.large (8GB RAM)
+3. Click "Apply" - wait for update
+4. Deploy your application
+5. After successful deployment, change back to t3.small
+6. Future deployments will be faster (cached layers)
+
+Cost: ~$0.10/hour during build (< $1 total for initial deployment)
+
+OPTION 2: OPTIMIZED BUILD (ALREADY APPLIED) ✅
+-----------------------------------------------
+I've already optimized your Dockerfiles to use less memory:
+- Frontend: Limited Node.js heap to 1.5GB
+- Backend: Added build cache
+- npm: Disabled audit during install
+
+Try deploying again with these optimizations on t3.small!
+
+Create new zip and upload:
+> Compress-Archive -Path * -DestinationPath duc-eb-deploy.zip -Force
+
+OPTION 3: PRE-BUILD IMAGES (PRODUCTION BEST PRACTICE) 🏆
+---------------------------------------------------------
+Build images on your LOCAL machine, push to AWS ECR, EB just pulls them.
+
+Benefits:
+✓ No memory issues on EB instance
+✓ Faster deployments
+✓ Same images in dev and prod
+✓ Better for CI/CD
+
+Steps:
+1. Create ECR repos:
+   aws ecr create-repository --repository-name duc-backend --region us-east-1
+   aws ecr create-repository --repository-name duc-nginx --region us-east-1
+
+2. Login to ECR:
+   aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+
+3. Build locally:
+   docker build -t duc-backend:latest -f Dockerfile .
+   docker build -t duc-nginx:latest -f Dockerfile.frontend .
+
+4. Tag for ECR:
+   docker tag duc-backend:latest YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/duc-backend:latest
+   docker tag duc-nginx:latest YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/duc-nginx:latest
+
+5. Push to ECR:
+   docker push YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/duc-backend:latest
+   docker push YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/duc-nginx:latest
+
+6. Update docker-compose.yml:
+   Replace "build:" sections with "image:" pointing to ECR URLs
+
+7. Deploy to EB (now just pulls pre-built images - super fast!)
+
+RECOMMENDED APPROACH:
+====================
+1. Try OPTION 2 first (optimized build) - it's already done!
+2. If still fails, use OPTION 1 (temp larger instance)
+3. For production, eventually move to OPTION 3 (ECR)
+
+MEMORY REQUIREMENTS:
+===================
+- Backend build: ~600MB
+- Frontend build: ~800MB  
+- Both together: ~1.5-2GB
+- t3.small total: 2GB (system uses ~500MB)
+- Result: OOM! 💥
+
+With optimizations: Should work on t3.small
+Without: Need t3.medium (4GB) or t3.large (8GB)
